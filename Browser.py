@@ -8,12 +8,16 @@ SCROLL_STEP = 100
 FONTS = {}
 
 class Text:
-    def __init__(self, text):
+    def __init__(self, text, parent):
         self.text = text
+        self.children = []
+        self.parent = parent
 
-class Tag:
-    def __init__(self, tag):
+class Element:
+    def __init__(self, tag, parent):
         self.tag = tag
+        self.children = []
+        self.parent = parent
 
 class Browser:
     def __init__(self):
@@ -64,7 +68,7 @@ def lex(body):
             buffer = ""
         elif c == ">":
             in_tag = False
-            out.append(Tag(buffer))
+            out.append(Element(buffer))
             buffer = ""
         else:
             buffer += c
