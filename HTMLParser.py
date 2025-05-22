@@ -7,7 +7,6 @@ class HTMLParser:
         self.unfinished = []
 
     def parse(self):
-        out = []
         text = ""
         in_tag = False
         for c in self.body:
@@ -22,15 +21,17 @@ class HTMLParser:
             else:
                 text += c
         if not in_tag and text:
-            out.append(Text(text))
-        return out
+            self.add_text(text)
+        return self.finish()
 
     def add_text(self, text):
+        if text.isspace(): return
         parent = self.unfinished[-1]
         node = Text(text, parent)
         parent.children.append(node)
 
     def add_tag(self, tag):
+        if tag.startswith("!"): return
         if tag.startswith("/"):
             if len(self.unfinished) == 1: return # For the last node
             node = self.unfinished.pop()
@@ -38,7 +39,6 @@ class HTMLParser:
             parent.children.append(node)
         else:
             parent = self.unfinished[-1] if self.unfinished else None # For the first node (has no parent)
-            parent = self.unfinished[-1]
             node = Element(tag, parent)
             self.unfinished.append(node)
 
@@ -48,3 +48,8 @@ class HTMLParser:
             parent = self.unfinished[-1]
             parent.children.append(node)
         return self.unfinished.pop()
+
+def print_tree(node, indent=0):
+    print(" " * indent, node)
+    for child in node.children:
+        print_tree(child, indent + 2)
