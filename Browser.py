@@ -2,32 +2,17 @@ import tkinter
 import tkinter.font
 from typing import Literal
 
+from HTMLParser import HTMLParser, print_tree, Text, Element
+
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 FONTS = {}
 
-class Text:
-    def __init__(self, text, parent):
-        self.text = text
-        self.children = []
-        self.parent = parent
-
-    def __repr__(self):
-        return repr(self.text)
-
-class Element:
-    def __init__(self, tag, attributes, parent):
-        self.tag = tag
-        self.attributes = attributes
-        self.children = []
-        self.parent = parent
-
-    def __repr__(self):
-        return "<" + self.tag + ">"
 
 class Browser:
     def __init__(self):
+        self.nodes = None
         self.display_list = None
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
@@ -42,9 +27,9 @@ class Browser:
 
     def load(self, url):
         body = url.request()
-        tokens = lex(body)
-        self.display_list = Layout(tokens).display_list
-        print(self.display_list)
+        self.nodes = HTMLParser(body).parse()
+        print_tree(self.nodes)
+        self.display_list = Layout(self.nodes).display_list
         self.draw()
 
     def draw(self):
@@ -63,27 +48,6 @@ class Browser:
         self.draw()
 
 
-
-def lex(body):
-    out = []
-    buffer = ""
-    in_tag = False
-    for c in body:
-        if c == "<":
-            in_tag = True
-            if buffer: out.append(Text(buffer))
-            buffer = ""
-        elif c == ">":
-            in_tag = False
-            out.append(Element(buffer))
-            buffer = ""
-        else:
-            buffer += c
-    if not in_tag and buffer:
-        out.append(Text(buffer))
-    return out
-
-
 def get_font(size, weight, style):
     key = (size, weight, style)
     if key not in FONTS:
@@ -94,7 +58,7 @@ def get_font(size, weight, style):
     return FONTS[key][0]
 
 class Layout:
-    def __init__(self, tokens):
+    def __init__(self, nodes: Element):
         self.line = []
         self.display_list = []
         self.cursor_x = HSTEP
@@ -102,35 +66,44 @@ class Layout:
         self.weight: Literal["normal", "bold"] = "normal"
         self.style: Literal["roman", "italic"] = "roman"
         self.size = 12
-        for tok in tokens:
-            self.token(tok)
-        self.flush()
 
-    def token(self, tok):
-        if isinstance(tok, Text):
-            for word in tok.text.split():
-                self.word(word)
-        elif tok.tag == "i":
+        self.recurse(nodes)
+
+    def open_tag(self, tag):
+        if tag == "i":
             self.style = "italic"
-        elif tok.tag == "/i":
-            self.style = "roman"
-        elif tok.tag == "b":
+        elif tag == "b":
             self.weight = "bold"
-        elif tok.tag == "/b":
-            self.weight = "normal"
-        elif tok.tag == "small":
+        elif tag == "small":
             self.size -= 2
-        elif tok.tag == "/small":
-            self.size += 2
-        elif tok.tag == "big":
+        elif tag == "big":
             self.size += 4
-        elif tok.tag == "/big":
-            self.size -= 4
-        elif tok.tag == "br":
+        elif tag == "br":
             self.flush()
-        elif tok.tag == "/p":
+
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "p":
             self.flush()
             self.cursor_y += VSTEP
+
+    def recurse(self, tree):
+        if isinstance(tree, Text):
+            for word in tree.text.split():
+                self.word(word)
+        else:
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
+
 
     def word(self, word):
         font = get_font(self.size, self.weight, self.style)
