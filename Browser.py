@@ -17,8 +17,9 @@ class Text:
         return repr(self.text)
 
 class Element:
-    def __init__(self, tag, parent):
+    def __init__(self, tag, attributes, parent):
         self.tag = tag
+        self.attributes = attributes
         self.children = []
         self.parent = parent
 
