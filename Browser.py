@@ -13,7 +13,7 @@ FONTS = {}
 class Browser:
     def __init__(self):
         self.nodes = None
-        self.display_list = None
+        self.document = None
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
@@ -29,7 +29,8 @@ class Browser:
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         print_tree(self.nodes)
-        self.display_list = Layout(self.nodes).display_list
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
         self.draw()
 
     def draw(self):
@@ -57,8 +58,25 @@ def get_font(size, weight, style):
         FONTS[key] = (font, label)
     return FONTS[key][0]
 
-class Layout:
-    def __init__(self, nodes: Element):
+class DocumentLayout:
+    def __init__(self, node):
+        self.node = node
+        self.parent = None
+        self.children = []
+
+    def layout(self):
+        child = BlockLayout(self.node, self, None)
+        self.children.append(child)
+        child.layout()
+
+class BlockLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+
+    def layout(self):
         self.line = []
         self.display_list = []
         self.cursor_x = HSTEP
@@ -67,7 +85,7 @@ class Layout:
         self.style: Literal["roman", "italic"] = "roman"
         self.size = 12
 
-        self.recurse(nodes)
+        self.recurse(self.node)
 
     def open_tag(self, tag):
         if tag == "i":
