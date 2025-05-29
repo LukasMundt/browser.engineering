@@ -45,7 +45,7 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c, f in self.display_list:
+        for x, y, c, f in self.document.display_list:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
             self.canvas.create_text(x, y - self.scroll, text=c, anchor=tkinter.NW, font=f)
@@ -70,6 +70,10 @@ def get_font(size, weight, style):
 
 class DocumentLayout:
     def __init__(self, node):
+        self.width = None
+        self.x = None
+        self.y = None
+        self.height = None
         self.node = node
         self.parent = None
         self.children = []
@@ -77,7 +81,14 @@ class DocumentLayout:
     def layout(self):
         child = BlockLayout(self.node, self, None)
         self.children.append(child)
+
+        self.width = WIDTH - 2 * HSTEP
+        self.x = HSTEP
+        self.y = VSTEP
         child.layout()
+        self.height = child.height
+
+        self.display_list = child.display_list
 
 class BlockLayout:
     def __init__(self, node, parent, previous):
@@ -86,7 +97,21 @@ class BlockLayout:
         self.previous = previous
         self.children = []
 
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
+        self.display_list = []
+
     def layout(self):
+        self.x = self.parent.x
+        self.width = self.parent.width
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+
         mode = self.layout_mode()
         if mode == "block":
             previous = None
@@ -107,6 +132,13 @@ class BlockLayout:
 
         for child in self.children:
             child.layout()
+            self.display_list += child.display_list
+
+        if mode == "block":
+            self.height = sum([
+                child.height for child in self.children])
+        else:
+            self.height = self.cursor_y
 
     def layout_mode(self):
         if isinstance(self.node, Text):
@@ -166,7 +198,7 @@ class BlockLayout:
     def word(self, word):
         font = get_font(self.size, self.weight, self.style)
         w = font.measure(word)
-        if self.cursor_x + w > WIDTH - HSTEP:
+        if self.cursor_x + w > self.width:
             self.flush()
 
         # self.display_list.append((self.cursor_x, self.cursor_y, word, font))
@@ -178,11 +210,12 @@ class BlockLayout:
         metrics = [font.metrics() for x, word, font in self.line]
         max_ascent = max([metric["ascent"] for metric in metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
-        for x, word, font in self.line:
-            y = baseline - font.metrics("ascent")
+        for rel_x, word, font in self.line:
+            x = self.x + rel_x
+            y = self.y + baseline - font.metrics("ascent")
             self.display_list.append((x, y, word, font))
         max_descent = max([metric["descent"] for metric in metrics])
         self.cursor_y = baseline + 1.25 * max_descent
-        self.cursor_x = HSTEP
+        self.cursor_x = 0
         self.line = []
 
