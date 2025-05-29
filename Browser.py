@@ -2,7 +2,7 @@ import tkinter
 import tkinter.font
 from typing import Literal
 
-from HTMLParser import HTMLParser, print_tree, Text, Element
+from HTMLParser import HTMLParser, print_tree, Text, Element, paint_tree
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -21,6 +21,7 @@ BLOCK_ELEMENTS = [
 
 class Browser:
     def __init__(self):
+        self.display_list = None
         self.nodes = None
         self.document = None
         self.window = tkinter.Tk()
@@ -40,12 +41,14 @@ class Browser:
         print_tree(self.nodes)
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
-        print_tree(self.document)
+
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
         self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c, f in self.document.display_list:
+        for x, y, c, f in self.display_list:
             if y > self.scroll + HEIGHT: continue
             if y + VSTEP < self.scroll: continue
             self.canvas.create_text(x, y - self.scroll, text=c, anchor=tkinter.NW, font=f)
@@ -88,7 +91,8 @@ class DocumentLayout:
         child.layout()
         self.height = child.height
 
-        self.display_list = child.display_list
+    def paint(self):
+        return []
 
 class BlockLayout:
     def __init__(self, node, parent, previous):
@@ -218,4 +222,7 @@ class BlockLayout:
         self.cursor_y = baseline + 1.25 * max_descent
         self.cursor_x = 0
         self.line = []
+
+    def paint(self):
+        return self.display_list
 
