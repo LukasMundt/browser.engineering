@@ -2,6 +2,7 @@ import tkinter
 import tkinter.font
 from typing import Literal
 
+from CSSParser import CSSParser
 from HTMLParser import HTMLParser, print_tree, Text, Element, paint_tree
 
 WIDTH, HEIGHT = 800, 600
@@ -39,6 +40,7 @@ class Browser:
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         print_tree(self.nodes)
+        style(self.nodes)
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
 
@@ -62,6 +64,14 @@ class Browser:
         self.scroll = max(0, self.scroll - SCROLL_STEP)
         self.draw()
 
+def style(node):
+    node.style = {}
+    if isinstance(node, Element) and "style" in node.attributes:
+        pairs = CSSParser(node.attributes["style"]).body()
+        for property, value in pairs.items():
+            node.style[property] = value
+    for child in node.children:
+        style(child)
 
 def get_font(size, weight, style):
     key = (size, weight, style)
@@ -219,9 +229,11 @@ class BlockLayout:
 
     def paint(self):
         cmds = []
-        if isinstance(self.node, Element) and self.node.tag == "pre":
+        bgcolor = self.node.style.get("background-color",
+                                      "transparent")
+        if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
         if self.layout_mode() == "inline":
             for x, y, word, font in self.display_list:
