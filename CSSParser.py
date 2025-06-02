@@ -70,25 +70,25 @@ class CSSParser:
             self.whitespace()
         return out
 
-def parse(self):
-    rules = []
-    while self.i < len(self.s):
-        try:
-            self.whitespace()
-            selector = self.selector()
-            self.literal("{")
-            self.whitespace()
-            body = self.body()
-            self.literal("}")
-            rules.append((selector, body))
-        except Exception:
-            why = self.ignore_until(["}"])
-            if why == "}":
-                self.literal("}")
+    def parse(self):
+        rules = []
+        while self.i < len(self.s):
+            try:
                 self.whitespace()
-            else:
-                break
-    return rules
+                selector = self.selector()
+                self.literal("{")
+                self.whitespace()
+                body = self.body()
+                self.literal("}")
+                rules.append((selector, body))
+            except Exception:
+                why = self.ignore_until(["}"])
+                if why == "}":
+                    self.literal("}")
+                    self.whitespace()
+                else:
+                    break
+        return rules
 
 class TagSelector:
     def __init__(self, tag):

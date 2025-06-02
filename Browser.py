@@ -19,6 +19,7 @@ BLOCK_ELEMENTS = [
     "legend", "details", "summary"
 ]
 
+DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 
 class Browser:
     def __init__(self):
@@ -40,7 +41,21 @@ class Browser:
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         print_tree(self.nodes)
-        style(self.nodes)
+        rules = DEFAULT_STYLE_SHEET.copy()
+        style(self.nodes, rules)
+        links = [node.attributes["href"]
+                 for node in tree_to_list(self.nodes, [])
+                 if isinstance(node, Element)
+                 and node.tag == "link"
+                 and node.attributes.get("rel") == "stylesheet"
+                 and "href" in node.attributes]
+        for link in links:
+            style_url = url.resolve(link)
+            try:
+                body = style_url.request()
+            except:
+                continue
+            rules.extend(CSSParser(body).parse())
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
 
@@ -64,14 +79,18 @@ class Browser:
         self.scroll = max(0, self.scroll - SCROLL_STEP)
         self.draw()
 
-def style(node):
+def style(node, rules):
     node.style = {}
+    for selector, body in rules:
+        if not selector.matches(node): continue
+        for property, value in body.items():
+            node.style[property] = value
     if isinstance(node, Element) and "style" in node.attributes:
         pairs = CSSParser(node.attributes["style"]).body()
         for property, value in pairs.items():
             node.style[property] = value
     for child in node.children:
-        style(child)
+        style(child, rules)
 
 def get_font(size, weight, style):
     key = (size, weight, style)
@@ -81,6 +100,12 @@ def get_font(size, weight, style):
         label = tkinter.Label(font=font)
         FONTS[key] = (font, label)
     return FONTS[key][0]
+
+def tree_to_list(tree, list):
+    list.append(tree)
+    for child in tree.children:
+        tree_to_list(child, list)
+    return list
 
 class DocumentLayout:
     def __init__(self, node):
