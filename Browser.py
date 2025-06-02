@@ -42,7 +42,7 @@ class Browser:
         self.nodes = HTMLParser(body).parse()
         print_tree(self.nodes)
         rules = DEFAULT_STYLE_SHEET.copy()
-        style(self.nodes, rules)
+
         links = [node.attributes["href"]
                  for node in tree_to_list(self.nodes, [])
                  if isinstance(node, Element)
@@ -56,6 +56,7 @@ class Browser:
             except:
                 continue
             rules.extend(CSSParser(body).parse())
+        style(self.nodes, sorted(rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
 
@@ -100,6 +101,10 @@ def get_font(size, weight, style):
         label = tkinter.Label(font=font)
         FONTS[key] = (font, label)
     return FONTS[key][0]
+
+def cascade_priority(rule):
+    selector, body = rule
+    return selector.priority
 
 def tree_to_list(tree, list):
     list.append(tree)
