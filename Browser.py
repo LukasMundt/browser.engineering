@@ -163,6 +163,22 @@ class LineLayout:
         self.previous = previous
         self.children = []
 
+    def layout(self):
+        # ...
+        for word in self.children:
+            word.layout()
+
+        max_ascent = max([word.font.metrics("ascent")
+                          for word in self.children])
+        baseline = self.y + 1.25 * max_ascent
+        for word in self.children:
+            word.y = baseline - word.font.metrics("ascent")
+        max_descent = max([word.font.metrics("descent")
+                           for word in self.children])
+
+    def paint(self):
+        return []
+
 class TextLayout:
     def __init__(self, node, word, parent, previous):
         self.node = node
@@ -170,6 +186,29 @@ class TextLayout:
         self.children = []
         self.parent = parent
         self.previous = previous
+
+    def layout(self):
+        weight = self.node.style["font-weight"]
+        style = self.node.style["font-style"]
+
+        if style == "normal": style = "roman"
+
+        size = int(float(self.node.style["font-size"][:-2]) * .75)
+        self.font = get_font(size, weight, style)
+
+        self.width = self.font.measure(self.word)
+
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+
+        self.height = self.font.metrics("linespace")
+
+    def paint(self):
+        color = self.node.style["color"]
+        return [DrawText(self.x, self.y, self.word, self.font, color)]
 
 class BlockLayout:
     def __init__(self, node, parent, previous):
@@ -184,8 +223,8 @@ class BlockLayout:
         self.height = None
 
     def layout(self):
-        self.x = self.parent.x
         self.width = self.parent.width
+        self.x = self.parent.x
 
         if self.previous:
             self.y = self.previous.y + self.previous.height
