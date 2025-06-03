@@ -44,8 +44,11 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
+        self.window.bind("<Button-1>", self.click)
+        self.url = None
 
     def load(self, url):
+        self.url = url
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         print_tree(self.nodes)
@@ -87,6 +90,25 @@ class Browser:
     def scrollup(self, e):
         self.scroll = max(0, self.scroll - SCROLL_STEP)
         self.draw()
+
+    def click(self, e):
+        x, y = e.x, e.y
+        y += self.scroll
+
+        objs = [obj for obj in tree_to_list(self.document, [])
+                if obj.x <= x < obj.x + obj.width
+                and obj.y <= y < obj.y + obj.height]
+
+        if not objs: return
+        elt = objs[-1].node
+
+        while elt:
+            if isinstance(elt, Text):
+                pass
+            elif elt.tag == "a" and "href" in elt.attributes:
+                url = self.url.resolve(elt.attributes["href"])
+                return self.load(url)
+            elt = elt.parent
 
 def style(node, rules):
     node.style = {}
@@ -158,13 +180,24 @@ class DocumentLayout:
 
 class LineLayout:
     def __init__(self, node, parent, previous):
+        self.width = 0
+        self.height = 0
+        self.x = 0
+        self.y = 0
         self.node = node
         self.parent = parent
         self.previous = previous
         self.children = []
 
     def layout(self):
-        # ...
+        self.width = self.parent.width
+        self.x = self.parent.x
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+
         for word in self.children:
             word.layout()
 
@@ -216,6 +249,7 @@ class BlockLayout:
         self.parent = parent
         self.previous = previous
         self.children = []
+        self.line = []
 
         self.x = None
         self.y = None
@@ -223,7 +257,7 @@ class BlockLayout:
         self.height = None
 
     def layout(self):
-        self.width = self.parent.width
+        mode = self.layout_mode()
         self.x = self.parent.x
 
         if self.previous:
@@ -231,9 +265,11 @@ class BlockLayout:
         else:
             self.y = self.parent.y
 
-        mode = self.layout_mode()
+        self.width = self.parent.width
+
         if mode == "block":
             previous = None
+
             for child in self.node.children:
                 next = BlockLayout(child, self, previous)
                 self.children.append(next)
@@ -244,9 +280,14 @@ class BlockLayout:
 
         for child in self.children:
             child.layout()
-            self.display_list += child.display_list
 
         self.height = sum([child.height for child in self.children])
+
+    def new_line(self):
+        self.cursor_x = 0
+        last_line = self.children[-1] if self.children else None
+        new_line = LineLayout(self.node, self, last_line)
+        self.children.append(new_line)
 
     def layout_mode(self):
         if isinstance(self.node, Text):
@@ -280,15 +321,16 @@ class BlockLayout:
         size = int(float(node.style["font-size"][:-2]) * .75)
         font = get_font(size, weight, style)
 
-        # w = font.measure(word)
+        w = font.measure(word)
 
         # self.line.append((self.cursor_x, word, font, color))
-        # self.cursor_x += w + font.measure(" ")
 
         line = self.children[-1]
         previous_word = line.children[-1] if line.children else None
         text = TextLayout(node, word, line, previous_word)
         line.children.append(text)
+
+        self.cursor_x += w + font.measure(" ")
 
         if self.cursor_x + w > self.width:
             self.new_line()
