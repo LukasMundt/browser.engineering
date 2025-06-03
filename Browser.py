@@ -156,6 +156,21 @@ class DocumentLayout:
     def paint(self):
         return []
 
+class LineLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+
+class TextLayout:
+    def __init__(self, node, word, parent, previous):
+        self.node = node
+        self.word = word
+        self.children = []
+        self.parent = parent
+        self.previous = previous
+
 class BlockLayout:
     def __init__(self, node, parent, previous):
         self.node = node
@@ -167,7 +182,6 @@ class BlockLayout:
         self.y = None
         self.width = None
         self.height = None
-        self.display_list = []
 
     def layout(self):
         self.x = self.parent.x
@@ -186,25 +200,14 @@ class BlockLayout:
                 self.children.append(next)
                 previous = next
         else:
-            self.cursor_x = 0
-            self.cursor_y = 0
-            self.weight = "normal"
-            self.style = "roman"
-            self.size = 12
-
-            self.line = []
+            self.new_line()
             self.recurse(self.node)
-            self.flush()
 
         for child in self.children:
             child.layout()
             self.display_list += child.display_list
 
-        if mode == "block":
-            self.height = sum([
-                child.height for child in self.children])
-        else:
-            self.height = self.cursor_y
+        self.height = sum([child.height for child in self.children])
 
     def layout_mode(self):
         if isinstance(self.node, Text):
@@ -238,12 +241,18 @@ class BlockLayout:
         size = int(float(node.style["font-size"][:-2]) * .75)
         font = get_font(size, weight, style)
 
-        w = font.measure(word)
-        if self.cursor_x + w > self.width:
-            self.flush()
+        # w = font.measure(word)
 
-        self.line.append((self.cursor_x, word, font, color))
-        self.cursor_x += w + font.measure(" ")
+        # self.line.append((self.cursor_x, word, font, color))
+        # self.cursor_x += w + font.measure(" ")
+
+        line = self.children[-1]
+        previous_word = line.children[-1] if line.children else None
+        text = TextLayout(node, word, line, previous_word)
+        line.children.append(text)
+
+        if self.cursor_x + w > self.width:
+            self.new_line()
 
     def flush(self):
         if not self.line: return
